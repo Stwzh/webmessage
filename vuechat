@@ -1,0 +1,205 @@
+        <el-dialog custom-class="chatroom" title="聊天室" :visible.sync="showchatbox" @closed="wbonclose">
+            <el-row :span="24">
+                <el-input v-model="roomsearch" style="width:200px;" placeholder="请输入聊天室名称" />
+                <el-select v-model="userselect" multiple filterable placeholder="请选择用户">
+                    <el-option v-for="item in users" :key="item.usercode" :label="item.username" :value="item.usercode" />
+                </el-select>
+                <!-- 添加按钮 -->
+                <el-button type="primary" @click="addroom">添加</el-button>
+            </el-row>
+            <el-row :span="24">
+                <el-col :span="6">
+                    <el-menu
+                        default-active="1"
+                        class="el-menu-vertical-demo"
+                        background-color="#9FD1F6"
+                        text-color="#fff"
+                        active-text-color="#000000"
+                        style="min-height:650px;"
+                    >
+
+                        <el-menu-item v-for="i in chatlabel" :key="i.sessionid" @click="connectroom(i.sessionid,i.name)">
+                            <i class="el-icon-menu" />
+                            <span slot="title">{{ i.name }}</span>
+                        </el-menu-item>
+
+                    </el-menu>
+                </el-col>
+                <el-col :span="18">
+                    <div style="min-height:700px;max-width: 730px;">
+                        <div class="chat-box">
+                            <header>聊天室:{{ roomnames }}
+                                <i v-if="roomnames!=''" style="margin-right:20px;cursor: pointer;margin-left:20px;" class="el-icon-user-solid" @click="viewmembers" />
+                                <i v-if="roomnames!=''" style="margin-right:20px;cursor: pointer;margin-left:20px;" class="el-icon-edit" @click="changeroomname" />
+                                <i v-if="roomnames!=''" style="cursor: pointer;" class="el-icon-delete" @click="delroom" /></header>
+                            <div ref="msg-box" class="msg-box">
+                                <div
+                                    v-for="(i,index) in chatlist"
+                                    :key="index"
+                                    class="msg"
+                                    :style="i.userId == loginname.username?'flex-direction:row-reverse':''"
+                                >
+                                    <div class="user-head">
+                                        <span
+                                            :style="i.userId == loginname.username?' float: right;font-size:13px;':''"
+                                            :class="i.userId == loginname.username?'right':'left'"
+                                        >{{ i.userId }}</span>
+                                    </div>
+                                    <div class="user-msg">
+                                        <span
+                                            :style="i.userId == loginname.username?' float: right;font-size:13px;':''"
+                                            :class="i.userId == loginname.username?'right':'left'"
+                                        >{{ i.msg }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="input-box">
+                                <input ref="sendMsg" v-model="contentText" type="text" @keyup.enter="sendText()">
+                                <div class="btn" :class="{['btn-active']:contentText}" @click="sendText()">发送</div>
+                            </div>
+                        </div>
+                    </div>
+                </el-col>
+            </el-row>
+        </el-dialog>
+<script>
+
+ scrollBottm() {
+            const el = this.$refs['msg-box']
+            el.scrollTop = el.scrollHeight
+        },
+        wbonclose() {
+            if (this.ws) {
+                console.log('断开连接?f')
+                this.ws.close()
+                this.ws.onclose = function() {
+                    console.log('关闭连接')
+                }
+                this.wburl = ''
+                this.roomnames = ''
+                this.chatlist = []
+            }
+        },
+        connectroom(val, name) {
+            if (this.ws !== null && this.wburl !== val) {
+                this.wbonclose()
+            }
+
+            const _this = this
+            _this.roomnames = name
+            if (_this.wburl === val) {
+                return
+            }
+            if (_this.ws !== null) {
+                console.log(_this.ws)
+                _this.wburl = val
+                _this.chatlist = []
+                getchatlog(_this.wburl).then(res => {
+                    console.log(res.data.message)
+                    if (res.data.message !== 'null' && res.data.message !== null) {
+                        console.log(res.data)
+                        console.log(JSON.parse(res.data.message))
+                        _this.chatlist = JSON.parse(res.data.message)
+                    }
+
+                    _this.ws = new WebSocket('ws://websocket地址/' + val)
+                    _this.ws.open = function(event) {
+                        console.log(event)
+                        _this.count = event.data
+                    }
+                    // _this.ws.onclose = _this.wbonclose
+                    const params = {
+                        userId: this.loginname.username,
+                        msg: '已加入聊天'
+                    }
+                    if (_this.ws.readyState === 1) {
+                        _this.ws.send(JSON.stringify(params))
+                    }
+                    if (_this.ws.readyState === 1) {
+                        _this.ws.onmessage = function(event) {
+                            console.log(event)
+                        }
+                    }
+                })
+            } else {
+                _this.wburl = val
+                getchatlog(_this.wburl).then(res => {
+                    console.log(res.data.message)
+                    if (res.data.message !== 'null' && res.data.message !== null) {
+                        console.log(res.data)
+                        console.log(JSON.parse(res.data.message))
+                        _this.chatlist = JSON.parse(res.data.message)
+                    }
+
+                    _this.ws = new WebSocket('ws://websocket地址' + val)
+                    _this.ws.open = function(event) {
+                        console.log(event)
+                        _this.count = event.data
+                    }
+                    _this.ws.onclose = _this.wbonclose
+                    const params = {
+                        userId: this.loginname.username,
+                        msg: '已加入聊天'
+                    }
+                    if (_this.ws.readyState === 1) {
+                        _this.ws.send(JSON.stringify(params))
+                    }
+                    if (_this.ws.readyState === 1) {
+                        _this.ws.onmessage = function(event) {
+                            console.log(event)
+                        }
+                    }
+                })
+            }
+        },
+        sendText() {
+            const _this = this
+            _this.$refs['sendMsg'].focus()
+            if (!_this.contentText) {
+                return
+            }
+            const params = {
+                userId: this.loginname.username,
+                msg: _this.contentText
+            }
+            if (this.ws === null) {
+                this.$message({
+                    message: '请先连接聊天室',
+                    type: 'warning'
+                })
+                this.roomnames = ''
+            }
+            if (this.ws.readyState === 1) {
+                this.ws.send(JSON.stringify(params))
+            } else {
+                // 提示
+                this.$message({
+                    message: '请先连接聊天室',
+                    type: 'warning'
+                })
+                this.roomnames = ''
+            }
+            if (this.ws.readyState === 1) {
+                this.ws.onmessage = function(event) {
+                    console.log(event.data)
+                    console.log(_this.chatlist)
+                    _this.chatlist.push(JSON.parse(event.data))
+                    console.log(_this.chatlist)
+                }
+            }
+            console.log(this.chatlist)
+            if (this.chatlist !== []) {
+                uploadrecord(this.wburl, this.chatlist).then(res => {
+
+                })
+            }
+
+            _this.contentText = ''
+            setTimeout(() => {
+                _this.scrollBottm()
+            }, 500)
+        }
+    }
+
+
+</script>
